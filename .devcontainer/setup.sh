@@ -8,7 +8,7 @@ set -uo pipefail  # NOTE: not -e, so we can catch failures and report them clean
 # ---- Configuration (edit these) ----
 GITLAB_HOST="git.gccis.rit.edu"
 GITLAB_URL="https://${GITLAB_HOST}"
-REPO_PATH="your-group/your-repo"          # no .git suffix
+REPO_PATH="sst1170/swen261gitlab"          # no .git suffix
 CLONE_DIR="/workspaces/SWEN261GitLab"
 
 log()  { echo "[setup] $*"; }
@@ -78,3 +78,39 @@ else
 fi
 
 log "Setup complete. Repo is at ${CLONE_DIR}."
+
+# ---- 7. Replace the live Codespace workspace with the GitLab clone ----
+# Codespaces checks out the GitHub template into /workspaces/<repo-name>.
+# Since the folder name matches on both sides, we swap that directory's
+# contents AND git history for the GitLab clone, keeping .devcontainer/
+# intact so future rebuilds of this container still work.
+
+WORKSPACE_DIR="/workspaces/$(basename "${REPO_PATH}")"
+TMP_CLONE="/tmp/gitlab-clone-$$"
+
+command -v rsync >/dev/null 2>&1 || fail "rsync is required but not installed. Add it via a devcontainer feature or 'apt-get install -y rsync' in postCreateCommand."
+
+if [ ! -d "${WORKSPACE_DIR}/.devcontainer" ]; then
+  fail "${WORKSPACE_DIR}/.devcontainer not found — refusing to swap; something's already wrong with the checkout."
+fi
+
+log "Cloning GitLab repo into a temp location..."
+rm -rf "${TMP_CLONE}"
+git clone "https://${GITLAB_HOST}/${REPO_PATH}.git" "${TMP_CLONE}" || fail "git clone into temp location failed."
+
+log "Syncing GitLab content into ${WORKSPACE_DIR} (preserving .devcontainer/)..."
+rsync -a --delete \
+  --exclude='.devcontainer/' \
+  "${TMP_CLONE}/" "${WORKSPACE_DIR}/" || fail "rsync from temp clone into workspace failed."
+
+rm -rf "${TMP_CLONE}"
+
+log "Verifying origin remote inside ${WORKSPACE_DIR}..."
+cd "${WORKSPACE_DIR}"
+ACTIVE_REMOTE=$(git remote get-url origin 2>/dev/null || echo "")
+case "${ACTIVE_REMOTE}" in
+  *"${GITLAB_HOST}"*) log "Confirmed: origin now points to GitLab (${ACTIVE_REMOTE})." ;;
+  *) fail "origin is '${ACTIVE_REMOTE}', not GitLab — the swap didn't take. Check for a stray .git left over from the GitHub checkout." ;;
+esac
+
+log "Workspace swap complete. VS Code's Source Control panel should now show ${GITLAB_HOST}."
