@@ -8,8 +8,8 @@ set -uo pipefail  # NOTE: not -e, so we can catch failures and report them clean
 # ---- Configuration (edit these) ----
 GITLAB_HOST="git.gccis.rit.edu"
 GITLAB_URL="https://${GITLAB_HOST}"
-REPO_PATH="sst1170/swen261gitlab"          # no .git suffix
-CLONE_DIR="/workspaces/swen261gitlab"
+REPO_PATH="2261-SWEN-261-00/project_teams/03/team-5/u-fund"          # no .git suffix
+CLONE_DIR="/workspaces/u-fund"
 
 log()  { echo "[setup] $*"; }
 fail() { echo "[setup] ERROR: $*" >&2; exit 1; }
